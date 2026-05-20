@@ -37,8 +37,9 @@ HELP_TEXT = (
     "<b>Comandi:</b>\n"
     "<code>/aggiungi 21/05</code> — aggiunge una data da monitorare\n"
     "<code>/rimuovi 21/05</code> — rimuove una data\n"
+    "<code>/rimuovi tutto</code> — rimuove tutte le date\n"
     "<code>/lista</code> — mostra le date attive\n"
-    "<code>/stop</code> — rimuove tutte le date\n"
+    "<code>/stop</code> — alias di <code>/rimuovi tutto</code>\n"
     "<code>/check</code> — stato attuale dei treni adesso\n"
     "<code>/help</code> — questa guida\n\n"
     "<b>Formati data accettati:</b>\n"
@@ -204,9 +205,21 @@ def handle_command(text, state):
             f"(primo check entro 5 min)"
         ), False
 
-    if cmd == "/rimuovi":
+    if cmd in ("/rimuovi", "/rimuovitutto"):
+        # "/rimuovi tutto" oppure "/rimuovitutto" -> svuota tutto
+        if cmd == "/rimuovitutto" or arg.lower() in ("tutto", "all", "*"):
+            n = len(state["active_dates"])
+            state["active_dates"] = []
+            state["last_status"]  = {}
+            if n == 0:
+                return "Nessuna data attiva da rimuovere.", False
+            return f"🧹 Rimosse tutte le date ({n}).", False
+
         if not arg:
-            return "Uso: <code>/rimuovi 21/05</code> (anche <code>21/05/2026</code> o <code>2026-05-21</code>)", False
+            return (
+                "Uso: <code>/rimuovi 21/05</code> per una data specifica,\n"
+                "oppure <code>/rimuovi tutto</code> per svuotare la lista."
+            ), False
         d, err = parse_date(arg)
         if err:
             return err, False
