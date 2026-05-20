@@ -1,5 +1,6 @@
 name: Monitor Treni Brescia-Milano
 
+# v1.1 — re-register schedule
 on:
   schedule:
     # Ogni 5 minuti, 24h/24. Repo pubblico = minuti Actions illimitati gratis.
