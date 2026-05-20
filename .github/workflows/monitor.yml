@@ -2,9 +2,14 @@ name: Monitor Treni Brescia-Milano
 
 on:
   schedule:
-    # Ogni 5 minuti. Cron GitHub Actions: minimo 5 min, possibili ritardi 5-15 min in alta domanda.
-    - cron: '*/5 * * * *'
-  workflow_dispatch:  # esecuzione manuale dal tab Actions
+    # Ogni 5 minuti, ma SOLO tra le 05:00 e le 21:59 UTC.
+    # In ora italiana:
+    #   - Estate (CEST, UTC+2): 07:00 - 23:59
+    #   - Inverno (CET, UTC+1): 06:00 - 22:59
+    # Nelle ore notturne il cron NON triggera affatto: 0 minuti consumati.
+    # workflow_dispatch resta sempre disponibile per esecuzioni manuali fuori finestra.
+    - cron: '*/5 5-21 * * *'
+  workflow_dispatch:  # esecuzione manuale dal tab Actions (sempre disponibile)
 
 # Evita esecuzioni sovrapposte: la successiva viene messa in coda finche' la precedente finisce
 concurrency:
