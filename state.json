@@ -1,5 +1,10 @@
 {
-  "active_dates": [],
-  "last_status": {},
-  "last_update_id": 999218548
+  "active_dates": [
+    "2026-05-21"
+  ],
+  "last_status": {
+    "2026-05-21|07:34": false,
+    "2026-05-21|08:39": false
+  },
+  "last_update_id": 999218551
 }
