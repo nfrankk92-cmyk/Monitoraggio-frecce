@@ -384,12 +384,13 @@ def main():
                 k: v for k, v in state["last_status"].items()
                 if not k.startswith(d + "|")
             }
+        print(f"[INFO] Rimosse {len(expired)} date scadute.")
         try:
             tg_send(tg_token, owner_chat,
                     "🗓 Date scadute rimosse automaticamente: " +
                     ", ".join(fmt_date_it(d) for d in expired))
         except Exception as e:
-            print(f"[WARN] notifica scadenza fallita: {e}")
+            print(f"[WARN] notifica scadenza fallita")
 
     # === 3. Check disponibilita' per ogni data attiva ===
     per_date_results = {}  # d -> list of (time, saleable, label, price)
@@ -409,7 +410,7 @@ def main():
             try:
                 statuses = check_date(session, csrf, d)
             except Exception as e:
-                print(f"[ERROR] check_date {d}: {e}")
+                print(f"[ERROR] check_date fallito: {type(e).__name__}")
                 continue
 
             any_saleable = False
@@ -420,11 +421,6 @@ def main():
                 state["last_status"][f"{d}|{t}"] = saleable
 
                 per_date_results.setdefault(d, []).append((t, saleable, label, price))
-                tag  = "✅" if saleable else "—"
-                line = f"{tag} {fmt_date_it(d)} {label} {t}"
-                if saleable and price is not None:
-                    line += f" • {price}€"
-                print(line)
 
                 # Notifica SEMPRE quando c'e' un posto libero (anche se gia' notificato)
                 if saleable:
@@ -453,6 +449,14 @@ def main():
                     print(f"[WARN] notifica 'nessun posto' fallita: {e}")
     else:
         print("Nessuna data attiva, salto controllo treni.")
+
+    # === 3b. Log aggregato (senza dettagli) ===
+    if per_date_results:
+        total_dates    = len(per_date_results)
+        total_trains   = sum(len(v) for v in per_date_results.values())
+        total_saleable = sum(1 for v in per_date_results.values() for (_, s, _, _) in v if s)
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{ts}] Check completato: {total_dates} date, {total_trains} treni verificati, {total_saleable} con posti.")
 
     # === 4. Risposta a /check / /controlla ===
     if forced_check:
