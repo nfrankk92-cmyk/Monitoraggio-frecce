@@ -1,11 +1,11 @@
 name: Monitor Treni Brescia-Milano
 
-# v1.1 — re-register schedule
+# v1.2 — cron con valori espliciti (workaround se */5 non triggera)
 on:
   schedule:
     # Ogni 5 minuti, 24h/24. Repo pubblico = minuti Actions illimitati gratis.
     # Cron GitHub Actions: minimo 5 min, possibili ritardi 5-15 min in alta domanda.
-    - cron: '*/5 * * * *'
+    - cron: '0,5,10,15,20,25,30,35,40,45,50,55 * * * *'
   workflow_dispatch:  # esecuzione manuale dal tab Actions
 
 # Evita esecuzioni sovrapposte: la successiva viene messa in coda finche' la precedente finisce
