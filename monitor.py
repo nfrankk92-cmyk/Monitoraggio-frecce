@@ -341,19 +341,21 @@ def main():
             return
 
         for d in sorted(state["active_dates"]):
+            # E' il primo check per questa data? (nessuna entry in last_status che inizi con "d|")
+            is_first_check = not any(k.startswith(d + "|") for k in state["last_status"])
+
             try:
                 statuses = check_date(session, csrf, d)
             except Exception as e:
                 print(f"[ERROR] check_date {d}: {e}")
                 continue
 
+            any_saleable = False
             for t in TARGET_TIMES:
                 if t not in statuses:
                     continue
                 saleable, label, price = statuses[t]
-                key          = f"{d}|{t}"
-                was_saleable = state["last_status"].get(key, False)
-                state["last_status"][key] = saleable
+                state["last_status"][f"{d}|{t}"] = saleable
 
                 tag  = "✅" if saleable else "—"
                 line = f"{tag} {fmt_date_it(d)} {label} {t}"
@@ -362,8 +364,9 @@ def main():
                 check_lines.append(line)
                 print(line)
 
-                # notifica solo sulla transizione FALSE -> TRUE
-                if saleable and not was_saleable:
+                # Notifica SEMPRE quando c'e' un posto libero (anche se gia' notificato)
+                if saleable:
+                    any_saleable = True
                     msg = (
                         f"<b>🎉 Posto Standard disponibile!</b>\n"
                         f"📅 {fmt_date_it(d)}\n"
@@ -375,6 +378,17 @@ def main():
                         tg_send(tg_token, owner_chat, msg)
                     except Exception as e:
                         print(f"[WARN] notifica disponibilita fallita: {e}")
+
+            # Primo check senza posti disponibili: rispondi con "nessun posto"
+            if is_first_check and not any_saleable:
+                try:
+                    tg_send(
+                        tg_token, owner_chat,
+                        f"📍 Per <b>{fmt_date_it(d)}</b>: nessun posto Standard disponibile al momento.\n"
+                        f"Ti avviserò appena si libera (controllo ogni ~5 min)."
+                    )
+                except Exception as e:
+                    print(f"[WARN] notifica 'nessun posto' fallita: {e}")
     else:
         print("Nessuna data attiva, salto controllo treni.")
 
