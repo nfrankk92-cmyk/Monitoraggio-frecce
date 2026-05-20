@@ -35,12 +35,16 @@ HELP_TEXT = (
     "<b>Monitor Treni Brescia → Milano</b>\n"
     "Controlla ogni ~5 min i treni delle <b>07:34</b> e <b>08:39</b> (classe Standard).\n\n"
     "<b>Comandi:</b>\n"
-    "<code>/aggiungi 2026-05-21</code> — aggiunge una data da monitorare\n"
-    "<code>/rimuovi 2026-05-21</code> — rimuove una data\n"
+    "<code>/aggiungi 21/05</code> — aggiunge una data da monitorare\n"
+    "<code>/rimuovi 21/05</code> — rimuove una data\n"
     "<code>/lista</code> — mostra le date attive\n"
     "<code>/stop</code> — rimuove tutte le date\n"
     "<code>/check</code> — stato attuale dei treni adesso\n"
     "<code>/help</code> — questa guida\n\n"
+    "<b>Formati data accettati:</b>\n"
+    "  <code>21/05</code>  (anno automatico)\n"
+    "  <code>21/05/2026</code>\n"
+    "  <code>2026-05-21</code>\n\n"
     "<i>⏱ Le risposte arrivano entro 5 min (al prossimo run del bot).</i>"
 )
 
@@ -102,11 +106,56 @@ def tg_get_updates(token, offset):
 # ---------- comandi ----------
 
 def parse_date(s):
-    try:
-        d = datetime.strptime(s.strip(), "%Y-%m-%d").date()
-        return d, None
-    except ValueError:
-        return None, "Formato data non valido. Usa <code>YYYY-MM-DD</code> (es: <code>2026-05-21</code>)"
+    """
+    Accetta vari formati:
+      21/05            -> DD/MM, anno auto-inferito (corrente se nel futuro, altrimenti +1)
+      21-05            -> idem
+      21/05/2026       -> DD/MM/YYYY esplicito
+      21-05-2026       -> idem
+      2026-05-21       -> ISO YYYY-MM-DD
+    Restituisce (date, None) oppure (None, "messaggio errore").
+    """
+    s = s.strip()
+    today = date.today()
+    fmt_err = (
+        "Formato data non valido. Usa uno di:\n"
+        "  <code>21/05</code>  (anno automatico)\n"
+        "  <code>21/05/2026</code>\n"
+        "  <code>2026-05-21</code>"
+    )
+
+    # ISO YYYY-MM-DD
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+        try:
+            return datetime.strptime(s, "%Y-%m-%d").date(), None
+        except ValueError:
+            return None, "Data non valida (giorno/mese inesistenti)."
+
+    # DD/MM/YYYY o DD-MM-YYYY o DD.MM.YYYY
+    m = re.fullmatch(r"(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})", s)
+    if m:
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        try:
+            return date(y, mo, d), None
+        except ValueError:
+            return None, "Data non valida (giorno/mese inesistenti)."
+
+    # DD/MM o DD-MM o DD.MM  -> anno inferito
+    m = re.fullmatch(r"(\d{1,2})[/\-.](\d{1,2})", s)
+    if m:
+        d, mo = int(m.group(1)), int(m.group(2))
+        # prova prima l'anno corrente; se gia' passato, l'anno successivo
+        for y in (today.year, today.year + 1):
+            try:
+                candidate = date(y, mo, d)
+            except ValueError:
+                return None, "Data non valida (giorno/mese inesistenti)."
+            if candidate >= today:
+                return candidate, None
+        # entrambi i tentativi sono nel passato: matematicamente impossibile per anno+1
+        return None, "Data non valida."
+
+    return None, fmt_err
 
 
 def fmt_date_it(s):
@@ -139,7 +188,7 @@ def handle_command(text, state):
 
     if cmd == "/aggiungi":
         if not arg:
-            return "Uso: <code>/aggiungi YYYY-MM-DD</code>", False
+            return "Uso: <code>/aggiungi 21/05</code> (anche <code>21/05/2026</code> o <code>2026-05-21</code>)", False
         d, err = parse_date(arg)
         if err:
             return err, False
@@ -157,7 +206,7 @@ def handle_command(text, state):
 
     if cmd == "/rimuovi":
         if not arg:
-            return "Uso: <code>/rimuovi YYYY-MM-DD</code>", False
+            return "Uso: <code>/rimuovi 21/05</code> (anche <code>21/05/2026</code> o <code>2026-05-21</code>)", False
         d, err = parse_date(arg)
         if err:
             return err, False
