@@ -40,12 +40,35 @@ jobs:
 
       - name: Commit state changes (if any)
         run: |
-          if [[ -n "$(git status --porcelain state.json)" ]]; then
-            git config user.name  "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add state.json
-            git commit -m "chore: update state [skip ci]"
-            git push
-          else
+          if [[ -z "$(git status --porcelain state.json)" ]]; then
             echo "Nessun cambio di stato, nulla da committare."
+            exit 0
           fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Retry: push puo' fallire se un altro run ha pushato nel frattempo
+          for attempt in 1 2 3 4 5; do
+            git add state.json
+            if git diff --staged --quiet; then
+              echo "Nulla da committare dopo rebase (stato gia' aggiornato dall'altro run)."
+              exit 0
+            fi
+            git commit -m "chore: update state [skip ci]"
+            if git push; then
+              echo "Push riuscito al tentativo $attempt."
+              exit 0
+            fi
+            echo "Push rifiutato (tentativo $attempt). Provo pull --rebase..."
+            git reset --soft HEAD~1  # disfa il commit per ripreparare lo stato dopo il rebase
+            git stash push -m "state-update-$attempt" -- state.json
+            if ! git pull --rebase origin main; then
+              echo "Rebase fallito, abort."
+              git rebase --abort || true
+              exit 1
+            fi
+            git stash pop || true
+            sleep $((attempt * 2))
+          done
+          echo "Push fallito dopo 5 tentativi."
+          exit 1
