@@ -40,8 +40,12 @@ HELP_TEXT = (
     "<code>/lista</code> — mostra le date attive\n"
     "<code>/stop</code> — rimuove tutte le date\n"
     "<code>/check</code> — stato attuale dei treni adesso\n"
-    "<code>/help</code> — questa guida"
+    "<code>/help</code> — questa guida\n\n"
+    "<i>⏱ Le risposte arrivano entro 5 min (al prossimo run del bot).</i>"
 )
+
+UNKNOWN_CMD_TEXT  = "❓ Comando non riconosciuto.\nScrivi <code>/help</code> per la lista dei comandi."
+NOT_A_CMD_TEXT    = "👋 Ciao! Sono il bot di monitoraggio treni.\nScrivi <code>/help</code> per vedere cosa posso fare."
 
 
 # ---------- stato ----------
@@ -170,7 +174,12 @@ def handle_command(text, state):
     if cmd == "/check":
         return None, True   # gestito fuori
 
-    return None, False  # comando sconosciuto: silenzio
+    # Comando che inizia con / ma non riconosciuto
+    if cmd.startswith("/"):
+        return UNKNOWN_CMD_TEXT, False
+
+    # Testo libero (non comando)
+    return NOT_A_CMD_TEXT, False
 
 
 # ---------- API Le Frecce ----------
@@ -287,7 +296,7 @@ def main():
             print(f"[INFO] Ignoro messaggio da chat {chat.get('id')} (non autorizzato)")
             continue
         text = msg.get("text", "") or ""
-        if not text.startswith("/"):
+        if not text.strip():
             continue
 
         reply, fc = handle_command(text, state)
