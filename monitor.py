@@ -40,7 +40,7 @@ HELP_TEXT = (
     "<code>/rimuovi tutto</code> — rimuove tutte le date\n"
     "<code>/lista</code> — mostra le date attive\n"
     "<code>/stop</code> — alias di <code>/rimuovi tutto</code>\n"
-    "<code>/check</code> — stato attuale dei treni adesso\n"
+    "<code>/controlla</code> — stato attuale dei treni adesso (alias <code>/ora</code> <code>/check</code>)\n"
     "<code>/help</code> — questa guida\n\n"
     "<b>Formati data accettati:</b>\n"
     "  <code>21/05</code>  (anno automatico)\n"
@@ -233,7 +233,7 @@ def handle_command(text, state):
         }
         return f"❌ Rimosso <b>{fmt_date_it(ds)}</b>.", False
 
-    if cmd == "/check":
+    if cmd in ("/check", "/controlla", "/controllaora", "/ora"):
         return None, True   # gestito fuori
 
     # Comando che inizia con / ma non riconosciuto
@@ -365,9 +365,9 @@ def main():
         forced_check = forced_check or fc
         if fc:
             try:
-                tg_send(tg_token, owner_chat, "🔄 Eseguo un check immediato...")
+                tg_send(tg_token, owner_chat, "🔄 Controllo in corso...")
             except Exception as e:
-                print(f"[WARN] reply /check fallita: {e}")
+                print(f"[WARN] reply /controlla fallita: {e}")
         elif reply:
             try:
                 tg_send(tg_token, owner_chat, reply)
@@ -392,7 +392,7 @@ def main():
             print(f"[WARN] notifica scadenza fallita: {e}")
 
     # === 3. Check disponibilita' per ogni data attiva ===
-    check_lines = []
+    per_date_results = {}  # d -> list of (time, saleable, label, price)
     if state["active_dates"]:
         try:
             session = requests.Session()
@@ -419,11 +419,11 @@ def main():
                 saleable, label, price = statuses[t]
                 state["last_status"][f"{d}|{t}"] = saleable
 
+                per_date_results.setdefault(d, []).append((t, saleable, label, price))
                 tag  = "✅" if saleable else "—"
                 line = f"{tag} {fmt_date_it(d)} {label} {t}"
                 if saleable and price is not None:
                     line += f" • {price}€"
-                check_lines.append(line)
                 print(line)
 
                 # Notifica SEMPRE quando c'e' un posto libero (anche se gia' notificato)
@@ -454,13 +454,30 @@ def main():
     else:
         print("Nessuna data attiva, salto controllo treni.")
 
-    # === 4. Risposta a /check ===
+    # === 4. Risposta a /check / /controlla ===
     if forced_check:
-        body = "<b>Stato attuale:</b>\n" + "\n".join(check_lines) if check_lines else "Nessuna data attiva."
+        if not per_date_results:
+            body = (
+                "❓ <b>Nessuna data attiva.</b>\n"
+                "Usa <code>/aggiungi 21/05</code> per iniziare il monitoraggio."
+            )
+        else:
+            parts = ["<b>📊 Stato attuale</b>"]
+            for d in sorted(per_date_results.keys()):
+                parts.append(f"\n📅 <b>{fmt_date_it(d)}</b>")
+                # ordine fisso: 07:34 prima di 08:39
+                for t, saleable, label, price in sorted(per_date_results[d], key=lambda x: x[0]):
+                    if saleable:
+                        extra = f" — <b>{price}€</b>" if price is not None else ""
+                        parts.append(f"  ✅ {label} {t} — <b>disponibile</b>{extra}")
+                    else:
+                        parts.append(f"  ⏳ {label} {t} — non disponibile")
+            parts.append("\n<i>Monitoraggio attivo. Ti avviso appena si libera.</i>")
+            body = "\n".join(parts)
         try:
             tg_send(tg_token, owner_chat, body)
         except Exception as e:
-            print(f"[WARN] reply /check fallita: {e}")
+            print(f"[WARN] reply /controlla fallita: {e}")
 
     save_state(state)
 
