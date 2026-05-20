@@ -1,0 +1,36 @@
+name: Monitor Treni Brescia-Milano
+
+on:
+  schedule:
+    # ogni 5 minuti. GitHub Actions ha minimo 5 min; in alta domanda puo' ritardare 5-15 min.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # consente esecuzione manuale dal tab Actions
+
+# evita esecuzioni sovrapposte se una precedente e' ancora in corso
+concurrency:
+  group: monitor-treni
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run monitor
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TARGET_DATE:      ${{ vars.TARGET_DATE }}
+        run: python monitor.py
